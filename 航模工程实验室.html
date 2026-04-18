@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>航模工程实验室 V4.0 (Complete)</title>
+    <style>
+        :root { 
+            --primary: #2563eb; 
+            --warn: #f59e0b; 
+            --danger: #ef4444; 
+            --success: #10b981;
+            --bg: #f8fafc; 
+            --border: #e2e8f0;
+        }
+        * { 
+            box-sizing: border-box; 
+            font-family: 'Inter', system-ui, sans-serif; 
+        }
+        body { 
+            background: var(--bg); 
+            padding: 20px; 
+            color: #1e293b; 
+            line-height: 1.5;
+            margin: 0;
+            overflow: hidden;
+        }
+        
+        .container { 
+            max-width: 100vw; 
+            max-height: calc(100vh - 40px);
+            display: flex; 
+            gap: 10px; 
+            position: relative;
+        }
+        
+        /* 可拖拽面板 */
+        .panel { 
+            background: white; 
+            border-radius: 16px; 
+            padding: 25px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid var(--border); 
+            min-width: 300px;
+            min-height: 300px;
+            resize: both;
+            overflow: auto;
+        }
+        
+        .drag-handle {
+            height: 10px;
+            background: linear-gradient(to right, #e2e8f0, #cbd5e1);
+            cursor: col-resize;
+            position: absolute;
+            left: 350px;
+            top: 0;
+            bottom: 0;
+            width: 10px;
+            z-index: 100;
+        }
+        
+        .drag-handle:hover {
+            background: linear-gradient(to right, #d1d5db, #9ca3af);
+        }
+        
+        /* 3D视图容器 */
+        .model-viewer {
+            flex: 1;
+            background: white;
+            border-radius: 16px; 
+            border: 1px solid var(--border); 
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #threejs-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .control-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 10;
+        }
+        
+        /* 标准面板样式 */
+        h2 { 
+            font-size: 1.1rem; 
+            margin-top: 0; 
+            color: var(--primary); 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            border-bottom: 2px solid #eef2ff; 
+            padding-bottom: 12px; 
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        h2::before {
+            content: "⚙️";
+            font-size: 1.2rem;
+        }
+        
+        /* 输入项样式 */
+        .input-item { 
+            margin-bottom: 18px; 
+        }
+        label { 
+            display: block; 
+            font-size: 0.85rem; 
+            font-weight: 600; 
+            margin-bottom: 6px; 
+            color: #475569; 
+        }
+        .field { 
+            display: flex; 
+            border: 1px solid #cbd5e1; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            transition: all 0.3s ease;
+        }
+        .field:focus-within { 
+            border-color: var(--primary); 
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        input, select { 
+            flex: 1; 
+            border: none; 
+            padding: 10px 14px; 
+            outline: none; 
+            font-size: 0.95rem; 
+            font-weight: 500; 
+            width: 100%;
+            background: #f8fafc;
+        }
+        input:focus {
+            background: #eff6ff;
+        }
+        .unit { 
+            background: #f1f5f9; 
+            padding: 10px 14px; 
+            font-size: 0.75rem; 
+            color: #64748b; 
+            border-left: 1px solid #cbd5e1; 
+            min-width: 50px; 
+            text-align: center; 
+            font-weight: 600;
+        }
+        
+        /* 仪表盘样式 */
+        .dashboard { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+            gap: 18px; 
+            margin-bottom: 20px;
+        }
+        .card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 14px; 
+            border: 1px solid var(--border); 
+            position: relative; 
+            transition: transform 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        .card-label { 
+            font-size: 0.8rem; 
+            color: #64748b; 
+            font-weight: 600; 
+            margin-bottom: 5px;
+        }
+        .card-value { 
+            font-size: 1.6rem; 
+            font-weight: 800; 
+            margin-top: 5px; 
+            color: #0f172a; 
+            display: block;
+        }
+        .card-sub { 
+            font-size: 0.75rem; 
+            color: #94a3b8; 
+            margin-top: 6px; 
+        }
+        
+        /* 2D画布 */
+        #mainCanvas { 
+            background: white; 
+            border-radius: 16px; 
+            border: 1px solid var(--border); 
+            width: 100%; 
+            height: 380px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        
+        .log-box { 
+            background: #1e293b; 
+            color: #cbd5e1; 
+            padding: 20px; 
+            border-radius: 16px; 
+            font-family: 'Monaco', 'Consolas', monospace; 
+            font-size: 0.9rem; 
+            height: 200px; 
+            overflow-y: auto; 
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 4px 0;
+            border-left: 3px solid #475569;
+            padding-left: 10px;
+        }
+        .log-warn { 
+            color: var(--warn); 
+            border-left-color: var(--warn);
+        }
+        .log-danger { 
+            color: var(--danger); 
+            border-left-color: var(--danger);
+        }
+        .log-success {
+            color: var(--success);
+            border-left-color: var(--success);
+        }
+        .log-info {
+            color: #94a3b8;
+            border-left-color: #94a3b8;
+        }
+
+        /* 交互元素 */
+        .slider-container {
+            margin-top: 10px;
+        }
+        .slider {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #e2e8f0;
+            border-radius: 3px;
+            outline: none;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-ready { background: var(--success); }
+        .status-processing { background: var(--warn); animation: pulse 1.5s infinite; }
+        .status-error { background: var(--danger); }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+        
+        /* 隐藏默认滚动条 */
+        .panel::-webkit-scrollbar {
+            width: 8px;
+        }
+        .panel::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .panel::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .panel::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 参数输入面板 -->
+    <div class="panel" style="width: 350px;">
+        <h2>🌍 环境与大气</h2>
+        <div class="input-item">
+            <label>海拔高度</label>
+            <div class="field"><input type="number" id="alt" value="0" min="0" max="5000"><span class="unit">m</span></div>
+        </div>
+        <div class="input-item">
+            <label>环境温度</label>
+            <div class="field"><input type="number" id="temp" value="15" min="-40" max="50"><span class="unit">℃</span></div>
+        </div>
+
+        <h2>✈️ 气动几何 (全参数)</h2>
+        <div class="input-item">
+            <label>翼展 (b)</label>
+            <div class="field"><input type="number" id="span" value="1000" min="100" max="3000"><span class="unit">mm</span></div>
+        </div>
+        <div class="input-item">
+            <label>根弦/梢弦 (Cr/Ct)</label>
+            <div class="field"><input type="number" id="cr" value="200" min="20" max="500"><input type="number" id="ct" value="150" min="10" max="400"></div>
+        </div>
+        <div class="input-item">
+            <label>全机起飞重量</label>
+            <div class="field"><input type="number" id="weight" value="800" min="50" max="5000"><span class="unit">g</span></div>
+        </div>
+        <div class="input-item">
+            <label>平尾面积/力臂 (Sh/Lh)</label>
+            <div class="field"><input type="number" id="sh" value="3.0" min="0.1" max="10"><input type="number" id="lh" value="450" min="50" max="1500"></div>
+            <div class="card-sub">平尾面积单位: dm² | 力臂: mm</div>
+        </div>
+
+        <h2>🎯 重心位置调节</h2>
+        <div class="input-item">
+            <label>重心位置 (相对于前缘)</label>
+            <div class="field"><input type="number" id="cg" value="28" min="10" max="40" step="0.1"><span class="unit">%MAC</span></div>
+        </div>
+        <div class="slider-container">
+            <input type="range" min="10" max="40" value="28" step="0.1" class="slider" id="cgSlider">
+        </div>
+
+        <h2>🔋 动力系统优化模型</h2>
+        <div class="input-item">
+            <label>电机 KV / 内阻</label>
+            <div class="field"><input type="number" id="kv" value="1000" min="100" max="3000"><input type="number" id="res" value="0.06" min="0.01" max="0.5"><span class="unit">Ω</span></div>
+        </div>
+        <div class="input-item">
+            <label>电池电压/容量</label>
+            <div class="field"><select id="batS">
+                <option value="2">2S (7.4V)</option>
+                <option value="3" selected>3S (11.1V)</option>
+                <option value="4">4S (14.8V)</option>
+                <option value="6">6S (22.2V)</option>
+            </select><input type="number" id="mah" value="2200" min="500" max="10000"></div>
+        </div>
+        <div class="input-item">
+            <label>螺旋桨 直径/螺距/叶片数</label>
+            <div class="field">
+                <input type="number" id="pd" value="10" min="3" max="20" step="0.1">
+                <input type="number" id="pp" value="4.7" min="1" max="15" step="0.1">
+                <select id="blades">
+                    <option value="2">2叶</option>
+                    <option value="3" selected>3叶</option>
+                    <option value="4">4叶</option>
+                    <option value="5">5叶</option>
+                    <option value="6">6叶</option>
+                </select>
+            </div>
+            <span class="unit">inch</span>
+        </div>
+        <div class="input-item">
+            <label>螺旋桨类型 (效率修正系数)</label>
+            <select id="pEff">
+                <option value="1.1">APC Thin Electric (高效率)</option>
+                <option value="0.85">SF 慢飞桨 (高扭矩低效率)</option>
+                <option value="0.95">普通木桨/碳纤桨</option>
+                <option value="1.05">碳纤高性能桨</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- 拖拽分割线 -->
+    <div class="drag-handle" id="dragHandle"></div>
+
+    <!-- 3D模型和结果面板 -->
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+        <div class="model-viewer" id="modelViewer">
+            <canvas id="threejs-canvas"></canvas>
+            <div class="control-overlay">
+                <button onclick="rotateModel()">旋转模型</button>
+                <button onclick="zoomIn()">放大</button>
+                <button onclick="zoomOut()">缩小</button>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <div class="panel" style="flex: 1; height: 400px;">
+                <h2>📊 分析结果</h2>
+                <div class="dashboard">
+                    <div class="card">
+                        <div class="card-label">空气密度 (ρ)</div>
+                        <div id="res_rho" class="card-value">1.225</div>
+                        <div class="card-sub">kg/m³ (ISA修正)</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">失速速度 (Vs)</div>
+                        <div id="res_vs" class="card-value">--</div>
+                        <div class="card-sub">km/h (@CLmax=1.0)</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">静态推力 (Thrust)</div>
+                        <div id="res_t" class="card-value">--</div>
+                        <div id="res_tw" class="card-sub">推重比: --</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">全速电流 (Amps)</div>
+                        <div id="res_a" class="card-value">--</div>
+                        <div id="res_time" class="card-sub">理论续航: -- min</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">静稳定裕度 (SM)</div>
+                        <div id="res_sm" class="card-value">--</div>
+                        <div id="res_np" class="card-sub">中性点(NP): --%</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">螺距速比 (Vp/Vs)</div>
+                        <div id="res_sr" class="card-value">--</div>
+                        <div id="res_mach" class="card-sub">桨尖马赫数: --</div>
+                    </div>
+                </div>
+                
+                <h2>🔬 深度分析</h2>
+                <div class="dashboard">
+                    <div class="card">
+                        <div class="card-label">雷诺数 (Re)</div>
+                        <div id="res_re" class="card-value">--</div>
+                        <div class="card-sub">翼型流态分析</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">升力线斜率</div>
+                        <div id="res_aw" class="card-value">--</div>
+                        <div id="res_ah" class="card-sub">机翼/平尾: --/--</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">下洗角 (ε)</div>
+                        <div id="res_deda" class="card-value">--</div>
+                        <div class="card-sub">∂ε/∂α (rad/rad)</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">最大平飞速度</div>
+                        <div id="res_vmax" class="card-value">--</div>
+                        <div class="card-sub">考虑阻力极曲线</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">推力衰减系数</div>
+                        <div id="res_thrust_decay" class="card-value">--</div>
+                        <div class="card-sub">@平飞速度</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">有效推重比</div>
+                        <div id="res_eff_tw" class="card-value">--</div>
+                        <div class="card-sub">@平飞速度</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel" style="flex: 1; height: 400px;">
+                <h2>2D 设计视图</h2>
+                <canvas id="mainCanvas"></canvas>
+            </div>
+        </div>
+        
+        <div class="panel" style="flex: 1;">
+            <h2>📋 计算日志</h2>
+            <div class="log-box" id="log">
+                <div class="log-entry log-info">🔧 <span class="status-indicator status-ready"></span> 系统就绪。调整参数查看实时分析结果...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 引入Three.js库 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// 全局变量定义
+const ids = ['alt','temp','span','cr','ct','weight','sh','lh','cg','kv','res','batS','mah','pd','pp','blades','pEff'];
+const input = {};
+ids.forEach(id => input[id] = document.getElementById(id));
+
+const canvas2d = document.getElementById('mainCanvas');
+let ctx2d = canvas2d.getContext('2d');
+const logElement = document.getElementById('log');
+
+// Three.js 相关变量
+let scene, camera, renderer, airplane, cgPoint, npPoint, pointsGroup, propeller;
+let rotationEnabled = false;
+let zoomLevel = 1;
+
+// 初始化滑块同步
+document.getElementById('cgSlider').value = input.cg.value;
+document.getElementById('cgSlider').addEventListener('input', function() {
+    input.cg.value = this.value;
+    update();
+});
+
+input.cg.addEventListener('input', function() {
+    document.getElementById('cgSlider').value = this.value;
+});
+
+// 拖拽调整面板大小
+const dragHandle = document.getElementById('dragHandle');
+const leftPanel = document.querySelector('.panel');
+
+let isDragging = false;
+
+dragHandle.addEventListener('mousedown', startDrag);
+document.addEventListener('mousemove', drag);
+document.addEventListener('mouseup', stopDrag);
+
+function startDrag(e) {
+    isDragging = true;
+    e.preventDefault();
+}
+
+function drag(e) {
+    if (!isDragging) return;
+    
+    const containerRect = document.querySelector('.container').getBoundingClientRect();
+    const newWidth = e.clientX - containerRect.left - 5; // 5px偏移补偿
+    
+    if (newWidth > 250 && newWidth < window.innerWidth - 300) {
+        leftPanel.style.width = newWidth + 'px';
+    }
+}
+
+function stopDrag() {
+    isDragging = false;
+}
+
+// 日志函数
+function logMessage(msg, type = 'info') {
+    const entry = document.createElement('div');
+    entry.className = `log-entry log-${type}`;
+    
+    let icon = '';
+    switch(type) {
+        case 'warn': icon = '⚠️'; break;
+        case 'danger': icon = '🔥'; break;
+        case 'success': icon = '✅'; break;
+        case 'info': icon = 'ℹ️'; break;
+    }
+    
+    entry.innerHTML = `${icon} ${msg}`;
+    logElement.appendChild(entry);
+    logElement.scrollTop = logElement.scrollHeight;
+}
+
+function clearLog() {
+    logElement.innerHTML = '<div class="log-entry log-info">🔧 <span class="status-indicator status-processing"></span> 计算中...</div>';
+}
+
+// Three.js 初始化
+function initThreeJS() {
+    const canvas = document.getElementById('threejs-canvas');
+    
+    // 创建场景
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf8fafc);
+    
+    // 创建相机
+    camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+    camera.position.z = 15;
+    camera.position.y = 5;
+    
+    // 创建渲染器
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    
+    // 添加光源
+    const ambientLight = new THREE.AmbientLight(0x404040, 1);
+    scene.add(ambientLight);
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
+    
+    // 创建飞机模型
+    createAirplaneModel();
+    
+    // 添加坐标轴辅助
+    const axesHelper = new THREE.AxesHelper(5);
+    scene.add(axesHelper);
+    
+    // 开始动画循环
+    animate();
+    
+    // 窗口大小改变时更新
+    window.addEventListener('resize', onWindowResize);
+}
+
+function createAirplaneModel() {
+    // 清除旧模型
+    if (airplane) {
+        scene.remove(airplane);
+    }
+    
+    // 清除旧螺旋桨
+    if (propeller) {
+        scene.remove(propeller);
+        propeller = null;
+    }
+    
+    airplane = new THREE.Group();
+    
+    // 获取参数
+    const span = parseFloat(input.span.value) / 1000; // m
+    const cr = parseFloat(input.cr.value) / 1000; // m
+    const ct = parseFloat(input.ct.value) / 1000; // m
+    const sh = parseFloat(input.sh.value) / 100; // m²
+    const lh = parseFloat(input.lh.value) / 1000; // m
+    
+    // 创建完整的机身 (更真实的飞机外壳)
+    const fuselageLength = span * 1.2;
+    const fuselageRadius = 0.05;
+    
+    // 机身主体 - 圆柱体
+    const fuselageGeometry = new THREE.CylinderGeometry(fuselageRadius, fuselageRadius, fuselageLength, 16);
+    const fuselageMaterial = new THREE.MeshPhongMaterial({ 
+        color: 0x4f46e5,
+        transparent: true,
+        opacity: 0.7
+    });
+    const fuselage = new THREE.Mesh(fuselageGeometry, fuselageMaterial);
+    fuselage.rotation.z = Math.PI / 2;
+    fuselage.position.x = -fuselageLength / 2; // 将机身放在负X方向
+    airplane.add(fuselage);
+    
+    // 机头 - 圆锥体
+    const noseGeometry = new THREE.ConeGeometry(fuselageRadius, 0.3, 16);
+    const noseMaterial = new THREE.MeshPhongMaterial({ color: 0x3b82f6 });
+    const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+    nose.rotation.z = Math.PI / 2;
+    nose.position.x = -fuselageLength / 2 - 0.15; // 在机身前端
+    airplane.add(nose);
+    
+    // 机尾 - 较小的圆锥体
+    const tailGeometry = new THREE.ConeGeometry(fuselageRadius * 0.7, 0.4, 16);
+    const tailMaterial = new THREE.MeshPhongMaterial({ color: 0x3b82f6 });
+    const tail = new THREE.Mesh(tailGeometry, tailMaterial);
+    tail.rotation.z = -Math.PI / 2;
+    tail.position.x = fuselageLength / 2 - 0.2; // 在机身尾端
+    airplane.add(tail);
+    
+    // 主翼 (更真实的梯形)
+    const wingGeometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array([
+        // 左上
+        0, cr/2, 0,
+        // 右上
+        span, ct/2, 0,
+        // 右下
+        span, -ct/2, 0,
+        // 左下
+        0, -cr/2, 0
+    ]);
+    wingGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    
+    const indices = [
+        0, 1, 2,
+        0, 2, 3
+    ];
+    wingGeometry.setIndex(indices);
+    
+    const wingMaterial = new THREE.MeshPhongMaterial({ 
+        color: 0x2563eb,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+    });
+    
+    const wing = new THREE.Mesh(wingGeometry, wingMaterial);
+    airplane.add(wing);
+    
+    // 平尾 (较小的梯形)
+    const htailSpan = span * 0.4; // 平尾翼展为主翼的40%
+    const htailCr = cr * 0.6; // 平尾根弦为主翼根弦的60%
+    const htailCt = ct * 0.6; // 平尾梢弦为主翼梢弦的60%
+    
+    const htailGeometry = new THREE.BufferGeometry();
+    const htailVertices = new Float32Array([
+        // 左上
+        span + lh, htailCr/2, 0,
+        // 右上
+        span + lh + htailSpan, htailCt/2, 0,
+        // 右下
+        span + lh + htailSpan, -htailCt/2, 0,
+        // 左下
+        span + lh, -htailCr/2, 0
+    ]);
+    htailGeometry.setAttribute('position', new THREE.BufferAttribute(htailVertices, 3));
+    htailGeometry.setIndex(indices);
+    
+    const htailMaterial = new THREE.MeshPhongMaterial({ 
+        color: 0xef4444,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+    });
+    
+    const htail = new THREE.Mesh(htailGeometry, htailMaterial);
+    airplane.add(htail);
+    
+    // 垂直尾翼
+    const vtailHeight = htailCr * 1.5;
+    const vtailThickness = htailCt * 0.5;
+    const vtailGeometry = new THREE.BoxGeometry(vtailThickness, vtailHeight, htailCt);
+    const vtailMaterial = new THREE.MeshPhongMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.8 });
+    const vtail = new THREE.Mesh(vtailGeometry, vtailMaterial);
+    vtail.position.set(span + lh + htailSpan/2, vtailHeight/2, 0);
+    airplane.add(vtail);
+    
+    // 发动机/电机舱
+    const engineGeometry = new THREE.CylinderGeometry(0.03, 0.03, 0.1, 8);
+    const engineMaterial = new THREE.MeshPhongMaterial({ color: 0x1f2937 });
+    const engine = new THREE.Mesh(engineGeometry, engineMaterial);
+    engine.rotation.z = Math.PI / 2;
+    engine.position.x = -fuselageLength / 2 + 0.05; // 靠近机头
+    airplane.add(engine);
+    
+    // 螺旋桨 - 仅在input元素存在时创建
+    if (input.pd && input.pp && input.blades) {
+        createPropeller();
+    }
+    
+    // 创建点组用于标记关键点
+    pointsGroup = new THREE.Group();
+    
+    // 重心点 (红色球体)
+    const cgGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+    const cgMaterial = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+    cgPoint = new THREE.Mesh(cgGeometry, cgMaterial);
+    pointsGroup.add(cgPoint);
+    
+    // 中性点 (蓝色球体)
+    const npGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+    const npMaterial = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+    npPoint = new THREE.Mesh(npGeometry, npMaterial);
+    pointsGroup.add(npPoint);
+    
+    airplane.add(pointsGroup);
+    
+    scene.add(airplane);
+}
+
+function createPropeller() {
+    if (!scene || !airplane) return; // 安全检查
+    
+    if (propeller) {
+        airplane.remove(propeller);
+        propeller = null;
+    }
+    
+    propeller = new THREE.Group();
+    
+    // 获取螺旋桨参数
+    const diameter = parseFloat(input.pd.value) * 0.0254; // 转换为米
+    const bladesCount = parseInt(input.blades.value);
+    
+    // 创建螺旋桨中心毂
+    const hubGeometry = new THREE.CylinderGeometry(0.01, 0.01, 0.02, 8);
+    const hubMaterial = new THREE.MeshPhongMaterial({ color: 0x1f2937 });
+    const hub = new THREE.Mesh(hubGeometry, hubMaterial);
+    hub.rotation.z = Math.PI / 2;
+    hub.position.x = -0.6; // 在机头位置
+    propeller.add(hub);
+    
+    // 根据叶片数量创建螺旋桨叶片
+    for (let i = 0; i < bladesCount; i++) {
+        const angle = (i * 2 * Math.PI) / bladesCount;
+        
+        // 创建叶片
+        const bladeGeometry = new THREE.BoxGeometry(0.005, diameter * 0.8, 0.01);
+        const bladeMaterial = new THREE.MeshPhongMaterial({ color: 0xe5e7eb });
+        const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+        
+        // 定位叶片
+        blade.position.x = -0.6; // 在机头位置
+        blade.position.y = Math.sin(angle) * diameter * 0.4;
+        blade.position.z = Math.cos(angle) * diameter * 0.4;
+        
+        // 旋转叶片使其朝向外侧
+        blade.rotation.z = angle;
+        
+        propeller.add(blade);
+    }
+    
+    // 将螺旋桨添加到飞机上
+    airplane.add(propeller);
+}
+
+function updateModelPoints() {
+    if (!pointsGroup || !airplane) return;
+    
+    // 更新重心和中性点位置
+    const span = parseFloat(input.span.value) / 1000;
+    const mac = (2/3) * (parseFloat(input.cr.value)/1000 + parseFloat(input.ct.value)/1000 - 
+                         (parseFloat(input.cr.value)/1000 * parseFloat(input.ct.value)/1000) / 
+                         (parseFloat(input.cr.value)/1000 + parseFloat(input.ct.value)/1000));
+    
+    const cgPercent = parseFloat(input.cg.value) / 100;
+    let npPercent;
+    try {
+        const npVal = parseFloat(document.getElementById('res_np').textContent.replace('%', '').replace('中性点(NP): ', ''));
+        npPercent = isNaN(npVal) ? 0.35 : npVal / 100;
+    } catch (err) {
+        npPercent = 0.35; // 默认值
+    }
+    
+    // 重心位置 (相对于机身)
+    const cgPosition = -span * 0.6 + cgPercent * mac; // 相对于机身中心的位置
+    cgPoint.position.x = cgPosition;
+    cgPoint.position.y = 0.3; // 稍微抬高以便观察
+    cgPoint.position.z = 0.1; // 稍微向前
+    
+    // 中性点位置
+    const npPosition = -span * 0.6 + npPercent * mac; // 相对于机身中心的位置
+    npPoint.position.x = npPosition;
+    npPoint.position.y = -0.3; // 稍微降低以便区分
+    npPoint.position.z = -0.1; // 稍微向后
+    
+    // 更新点的可见性
+    cgPoint.visible = true;
+    npPoint.visible = true;
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    
+    if (rotationEnabled && airplane) {
+        airplane.rotation.y += 0.01;
+    }
+    
+    // 旋转螺旋桨
+    if (propeller) {
+        propeller.rotation.z += 0.1; // 模拟螺旋桨旋转
+    }
+    
+    renderer.render(scene, camera);
+}
+
+function onWindowResize() {
+    const canvas = document.getElementById('threejs-canvas');
+    camera.aspect = canvas.clientWidth / canvas.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+}
+
+// 控制函数
+function rotateModel() {
+    rotationEnabled = !rotationEnabled;
+}
+
+function zoomIn() {
+    zoomLevel *= 1.1;
+    camera.position.multiplyScalar(1/1.1);
+}
+
+function zoomOut() {
+    zoomLevel *= 0.9;
+    camera.position.multiplyScalar(1/0.9);
+}
+
+// 计算函数
+function update() {
+    try {
+        clearLog();
+        
+        // 1. 标准大气模型计算 (ISA)
+        const alt = parseFloat(input.alt.value);
+        const tempC = parseFloat(input.temp.value);
+        const tempK = tempC + 273.15;
+        
+        const P0 = 101325; // Pa
+        const T0 = 288.15; // K
+        const R = 287.05; // J/(kg·K)
+        const L = 0.0065; // K/m (温度递减率)
+        const g = 9.80665; // m/s²
+        
+        const P = P0 * Math.pow(1 - L * alt / T0, 5.2561);
+        const rho = P / (R * tempK);
+        
+        document.getElementById('res_rho').textContent = rho.toFixed(4);
+        logMessage(`空气密度: ${rho.toFixed(4)} kg/m³ (海拔${alt}m, 温度${tempC}°C)`, 'info');
+
+        // 2. 气动几何与失速计算
+        const b = parseFloat(input.span.value) / 1000; // m
+        const cr = parseFloat(input.cr.value) / 1000; // m
+        const ct = parseFloat(input.ct.value) / 1000; // m
+        const s = b * (cr + ct) / 2; // m²
+        const mac = (2/3) * (cr + ct - (cr*ct)/(cr+ct)); // m
+        const w = parseFloat(input.weight.value) / 1000; // kg
+        const clMax = 1.0; // 假设最大升力系数
+        
+        const vs_ms = Math.sqrt((2 * w * g) / (rho * s * clMax));
+        const vs_kmh = vs_ms * 3.6;
+        document.getElementById('res_vs').textContent = vs_kmh.toFixed(1);
+        logMessage(`失速速度: ${vs_kmh.toFixed(1)} km/h (翼载荷: ${(w/s).toFixed(1)} N/m²)`, 'info');
+
+        // 3. 动力系统模型 (改进的迭代算法)
+        const kv = parseFloat(input.kv.value);
+        const rm = parseFloat(input.res.value);
+        const v_bat = parseFloat(input.batS.value) * 3.7;
+        const d_m = parseFloat(input.pd.value) * 0.0254; // m
+        const p_m = parseFloat(input.pp.value) * 0.0254; // m
+        const p_eff = parseFloat(input.pEff.value);
+
+        // 获取叶片数量（用于修正系数）
+        const bladesCount = parseInt(input.blades.value) || 3; // 默认为3叶
+
+        // 在这里定义j变量
+        const j = p_m / d_m; // 螺距比
+
+        let current = 15; // 初始猜测值
+        let rpm = 0;
+        let iterations = 0;
+        const maxIterations = 10;
+        const tolerance = 0.1;
+        
+        while(iterations < maxIterations) {
+            const v_drop = v_bat - current * rm;
+            const new_rpm = Math.max(0, v_drop * kv * 0.88);
+            
+            if (Math.abs(new_rpm - rpm) < tolerance) {
+                rpm = new_rpm;
+                break;
+            }
+            
+            rpm = new_rpm;
+            const n_sec = rpm / 60;
+            
+            // 考虑叶片数量的功率系数修正
+            let cp_modifier = 1.0;
+            if (bladesCount === 2) cp_modifier = 0.95;
+            else if (bladesCount === 3) cp_modifier = 1.0;
+            else if (bladesCount === 4) cp_modifier = 1.05;
+            else if (bladesCount >= 5) cp_modifier = 1.1;
+            
+            const cp = 0.045 * (1 + 0.2 * j) * p_eff * cp_modifier;
+            const power_req = cp * rho * Math.pow(n_sec, 3) * Math.pow(d_m, 5);
+            
+            const motor_efficiency = Math.min(0.88, 0.92 - 0.0005 * current);
+            current = power_req / (v_drop * motor_efficiency);
+            
+            iterations++;
+        }
+
+        const n_sec = rpm / 60;
+        
+        // 考虑叶片数量的推力系数修正
+        let ct_modifier = 1.0;
+        if (bladesCount === 2) ct_modifier = 0.95;
+        else if (bladesCount === 3) ct_modifier = 1.0;
+        else if (bladesCount === 4) ct_modifier = 1.08;
+        else if (bladesCount >= 5) ct_modifier = 1.15;
+        
+        const ct_coeff = 0.1 * (1 + 0.15 * j) * p_eff * ct_modifier; 
+        const thrust_n = ct_coeff * rho * Math.pow(n_sec, 2) * Math.pow(d_m, 4);
+        const thrust_g = thrust_n / g * 1000;
+        const thrust_weight_ratio = thrust_g / (w * 1000);
+
+        document.getElementById('res_t').textContent = thrust_g.toFixed(0) + " g";
+        document.getElementById('res_tw').textContent = "推重比: " + thrust_weight_ratio.toFixed(2);
+        document.getElementById('res_a').textContent = current.toFixed(1) + " A";
+        
+        const capacity_ah = parseFloat(input.mah.value) / 1000;
+        const flight_time_min = (capacity_ah / current) * 60 * 0.8;
+        document.getElementById('res_time').textContent = "理论续航: " + flight_time_min.toFixed(1) + " min";
+
+        logMessage(`推力: ${thrust_g.toFixed(0)}g | 推重比: ${thrust_weight_ratio.toFixed(2)} | 电流: ${current.toFixed(1)}A`, 'info');
+
+        // 4. 深度稳定性分析
+        const sh = parseFloat(input.sh.value) / 100; // dm² -> m²
+        const lh = parseFloat(input.lh.value) / 1000; // mm -> m
+        
+        // 展弦比计算
+        const ar_main = b * b / s; // 主翼展弦比
+        const ar_htail = (lh * 2) * (lh * 2) / sh; // 平尾展弦比（估算）
+        
+        // 升力线斜率修正 (考虑展弦比)
+        const aw = (2 * Math.PI) / (1 + 2 / ar_main); // 机翼升力线斜率
+        const ah = (2 * Math.PI) / (1 + 2 / ar_htail); // 平尾升力线斜率
+        
+        document.getElementById('res_aw').textContent = aw.toFixed(2);
+        document.getElementById('res_ah').textContent = `机翼/平尾: ${aw.toFixed(2)}/${ah.toFixed(2)}`;
+        
+        // 下洗角修正系数
+        const deda = 2 / (Math.PI * ar_main); // ∂ε/∂α
+        document.getElementById('res_deda').textContent = deda.toFixed(3);
+        
+        // 纵向体积比 (考虑升力线斜率和下洗)
+        const vh = (sh * lh * ah) / (s * mac * aw) * (1 - deda);
+        const np_percent = 25 + vh * 100;
+        const cg_percent = parseFloat(input.cg.value);
+        const sm = np_percent - cg_percent;
+
+        document.getElementById('res_sm').textContent = sm.toFixed(1) + "%";
+        document.getElementById('res_np').textContent = "中性点(NP): " + np_percent.toFixed(1) + "%";
+
+        logMessage(`重心: ${cg_percent}%MAC | 中性点: ${np_percent}%MAC | 静稳定裕度: ${sm.toFixed(1)}%`, 'info');
+
+        // 5. 雷诺数计算
+        const mean_chord = (cr + ct) / 2;
+        const re = (rho * vs_ms * mean_chord) / 1.8e-5; // 动力粘度 (1.8e-5 Pa·s)
+        document.getElementById('res_re').textContent = Math.round(re).toLocaleString();
+        
+        if (re < 100000) {
+            logMessage(`⚠️ 警告: 雷诺数 ${Math.round(re).toLocaleString()} < 100,000，实际失速速度可能高于理论值`, 'warn');
+        } else {
+            logMessage(`✅ 雷诺数正常: ${Math.round(re).toLocaleString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`, 'success');
+        }
+
+        // 6. 最大平飞速度估算 (阻力极曲线)
+        const k = 1 / (Math.PI * ar_main * 0.85); // 诱导阻力因子 (假设效率因子0.85)
+        const cd0 = 0.025 + 0.01 * (s / 0.1); // 零升阻力系数 (估算)
+        
+        // 估算巡航CL (假设巡航升力系数)
+        const cl_cruise = 0.5;
+        const cd_cruise = cd0 + k * cl_cruise * cl_cruise;
+        
+        // 最大平飞速度 (推力等于阻力时)
+        const max_thrust_n = thrust_n; // 静态推力
+        const max_speed_ms = Math.sqrt((2 * max_thrust_n) / (rho * s * cd_cruise));
+        const max_speed_kmh = max_speed_ms * 3.6;
+        document.getElementById('res_vmax').textContent = max_speed_kmh.toFixed(1);
+        
+        logMessage(`最大平飞速度: ${max_speed_kmh.toFixed(1)} km/h (考虑阻力极曲线)`, 'info');
+
+        // 7. 动态推力衰减
+        const thrust_decay_factor = Math.max(0, 1 - (max_speed_kmh / (rpm * p_m * 60 / 1000)));
+        const effective_thrust = thrust_g * thrust_decay_factor;
+        const effective_tw_ratio = effective_thrust / (w * 1000);
+        
+        document.getElementById('res_thrust_decay').textContent = thrust_decay_factor.toFixed(2);
+        document.getElementById('res_eff_tw').textContent = effective_tw_ratio.toFixed(2);
+        
+        logMessage(`有效推重比: ${effective_tw_ratio.toFixed(2)} (@${max_speed_kmh.toFixed(1)} km/h)`, 'info');
+
+        // 8. 性能校验与安全分析
+        const pitch_speed = (rpm * p_m * 60) / 1000; // km/h
+        const speed_ratio = pitch_speed / vs_kmh;
+        const mach = (rpm * Math.PI * d_m / 60) / 340; // 桨尖马赫数
+
+        document.getElementById('res_sr').textContent = speed_ratio.toFixed(2);
+        document.getElementById('res_mach').textContent = "桨尖马赫数: " + mach.toFixed(3);
+
+        // 安全检查
+        if (mach > 0.7) {
+            logMessage("❌ 危险: 桨尖马赫数 > 0.7，进入跨音速区，效率剧降且噪音极大！建议降低KV或减小桨径", 'danger');
+        } else if (mach > 0.6) {
+            logMessage("⚠️ 警告: 桨尖马赫数 > 0.6，接近跨音速边界", 'warn');
+        } else {
+            logMessage("✅ 桨尖马赫数正常: " + mach.toFixed(3), 'success');
+        }
+
+        if (speed_ratio < 2.0) {
+            logMessage("⚠️ 警告: 螺距速比 < 2.0，高速飞行时推力严重衰减", 'warn');
+        } else if (speed_ratio > 4.0) {
+            logMessage("⚠️ 警告: 螺距速比 > 4.0，低速性能较差", 'warn');
+        } else {
+            logMessage("✅ 螺距速比正常: " + speed_ratio.toFixed(2), 'success');
+        }
+
+        if (sm < 5) {
+            logMessage("❌ 危险: 静稳定裕度 < 5%，飞机极难操控！建议前移重心至25-30%MAC", 'danger');
+        } else if (sm > 25) {
+            logMessage("⚠️ 警告: 静稳定裕度 > 25%，飞机反应迟钝", 'warn');
+        } else {
+            logMessage("✅ 静稳定裕度正常: " + sm.toFixed(1) + "%", 'success');
+        }
+
+        const battery_discharge_rate = 25; // 默认25C
+        const max_current = capacity_ah * battery_discharge_rate;
+        
+        if (current > max_current * 0.8) {
+            logMessage(`❌ 危险: 电流${current.toFixed(1)}A超过电池${battery_discharge_rate}C能力的80%(${(max_current*0.8).toFixed(1)}A)! 建议使用更高C数电池`, 'danger');
+        } else {
+            logMessage(`✅ 电池负载正常: ${current.toFixed(1)}A (80%C限制: ${(max_current*0.8).toFixed(1)}A)`, 'success');
+        }
+
+        // 更新3D模型
+        createAirplaneModel();
+        updateModelPoints();
+
+        // 绘制2D可视化图表
+        drawVisualization2D(cr, ct, b, mac, np_percent, cg_percent, vs_kmh, pitch_speed);
+
+        // 成功完成计算
+        logMessage("✅ 计算完成 - 所有参数已更新", 'success');
+
+    } catch(e) {
+        logMessage(`❌ 计算错误: ${e.message}`, 'danger');
+        console.error('计算错误:', e);
+        console.error('错误堆栈:', e.stack);
+    }
+}
+
+// 2D可视化绘制函数
+function drawVisualization2D(cr, ct, b, mac, np_percent, cg_percent, vs_kmh, pitch_speed) {
+    if (!canvas2d) return;
+    
+    // 设置画布尺寸
+    canvas2d.width = canvas2d.clientWidth;
+    canvas2d.height = canvas2d.clientHeight;
+    
+    const width = canvas2d.width;
+    const height = canvas2d.clientHeight;
+    ctx2d = canvas2d.getContext('2d');
+    
+    // 清空画布
+    ctx2d.clearRect(0, 0, width, height);
+    
+    // 计算缩放比例
+    const max_dim = Math.max(b * 1000, Math.max(cr * 1000, ct * 1000));
+    const maxChord = Math.max(cr * 1000, ct * 1000);
+    const scale = Math.min(width * 0.6 / max_dim, height * 0.6 / (maxChord || 1)); // 防止除以零
+    
+    // 绘图中心
+    const centerX = width * 0.3;
+    const centerY = height / 2;
+    
+    ctx2d.save();
+    ctx2d.translate(centerX, centerY);
+    
+    // 绘制机身中心线
+    ctx2d.beginPath();
+    ctx2d.moveTo(-centerX * 0.8, 0);
+    ctx2d.lineTo(centerX * 0.8, 0);
+    ctx2d.strokeStyle = '#e2e8f0';
+    ctx2d.lineWidth = 2;
+    ctx2d.stroke();
+    
+    // 绘制梯形机翼
+    ctx2d.beginPath();
+    ctx2d.moveTo(0, -cr * scale * 1000 / 2); // 翼根前缘
+    ctx2d.lineTo(b * 1000 / 2 * scale, -ct * scale * 1000 / 2); // 翼尖前缘
+    ctx2d.lineTo(b * 1000 / 2 * scale, ct * scale * 1000 / 2); // 翼尖后缘
+    ctx2d.lineTo(0, cr * scale * 1000 / 2); // 翼根后缘
+    ctx2d.closePath();
+    
+    ctx2d.fillStyle = 'rgba(37, 99, 235, 0.15)';
+    ctx2d.fill();
+    ctx2d.strokeStyle = '#1d4ed8';
+    ctx2d.lineWidth = 2;
+    ctx2d.stroke();
+    
+    // 绘制MAC线
+    const mac_x = b * 1000 / 2 * scale * 0.5; // MAC位置
+    const mac_start = -mac * scale * 1000 / 2;
+    const mac_end = mac_start + mac * scale * 1000;
+    
+    ctx2d.beginPath();
+    ctx2d.moveTo(mac_x, mac_start);
+    ctx2d.lineTo(mac_x, mac_end);
+    ctx2d.strokeStyle = '#f59e0b';
+    ctx2d.lineWidth = 2;
+    ctx2d.setLineDash([6, 4]);
+    ctx2d.stroke();
+    ctx2d.setLineDash([]);
+    
+    // 标注MAC长度
+    ctx2d.fillStyle = '#f59e0b';
+    ctx2d.font = 'bold 12px Arial';
+    ctx2d.textAlign = 'center';
+    ctx2d.fillText(`MAC: ${(mac * 1000).toFixed(0)}mm`, mac_x, mac_start - 15);
+    
+    // 绘制重心和中性点
+    const cg_x = mac_x + (cg_percent / 100) * mac * scale * 1000;
+    const np_x = mac_x + (np_percent / 100) * mac * scale * 1000;
+    
+    drawMarker2D(ctx2d, cg_x, 0, '#ef4444', `CG: ${cg_percent}%`);
+    drawMarker2D(ctx2d, np_x, 0, '#2563eb', `NP: ${np_percent}%`);
+    
+    // 性能信息标签
+    ctx2d.fillStyle = '#1e293b';
+    ctx2d.font = '12px Arial';
+    ctx2d.textAlign = 'left';
+    ctx2d.fillText(`失速速度: ${vs_kmh.toFixed(1)} km/h`, -centerX * 0.7, -height * 0.3);
+    ctx2d.fillText(`螺距速度: ${pitch_speed.toFixed(1)} km/h`, -centerX * 0.7, -height * 0.3 + 20);
+    const wingArea = b * (cr + ct) / 2;
+    const wingLoadingText = wingArea > 0 ? ((parseFloat(input.weight.value)/1000)/(wingArea*100)).toFixed(1) : '--';
+    ctx2d.fillText(`翼载荷: ${wingLoadingText} g/dm²`, -centerX * 0.7, -height * 0.3 + 40);
+    
+    ctx2d.restore();
+}
+
+// 绘制2D标记函数
+function drawMarker2D(ctx, x, y, color, label) {
+    if (!ctx) return; // 防止上下文未定义
+    
+    ctx.save();
+    ctx.translate(x, y);
+    
+    // 绘制三角形标记
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, -12);
+    ctx.lineTo(-8, 0);
+    ctx.lineTo(8, 0);
+    ctx.closePath();
+    ctx.fill();
+    
+    // 添加标签
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, 0, -18);
+    
+    // 描边
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    
+    ctx.restore();
+}
+
+// 事件绑定
+ids.forEach(id => {
+    const element = input[id];
+    if (element) {
+        element.addEventListener('input', update);
+        
+        // 添加输入验证
+        element.addEventListener('blur', function() {
+            const val = parseFloat(this.value);
+            if (isNaN(val)) {
+                this.style.borderColor = '#ef4444';
+                this.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+                setTimeout(() => {
+                    this.style.borderColor = '#cbd5e1';
+                    this.style.boxShadow = 'none';
+                }, 2000);
+            } else {
+                this.style.borderColor = '#10b981';
+                this.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                setTimeout(() => {
+                    this.style.borderColor = '#cbd5e1';
+                    this.style.boxShadow = 'none';
+                }, 500);
+            }
+        });
+    }
+});
+
+// 页面加载完成后初始化
+window.addEventListener('load', function() {
+    logMessage("🚀 航模工程实验室 V4.0 已启动", 'success');
+    
+    // 初始化Three.js
+    initThreeJS();
+    
+    // 初始计算
+    update();
+});
+
+// 窗口大小改变时重新绘制
+window.addEventListener('resize', function() {
+    update();
+    
+    // 更新Three.js画布大小
+    if (renderer) {
+        const canvas = document.getElementById('threejs-canvas');
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+        camera.aspect = canvas.clientWidth / canvas.clientHeight;
+        camera.updateProjectionMatrix();
+    }
+});
+
+// 添加键盘快捷键支持
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key === 'r') {
+        e.preventDefault();
+        update();
+    }
+});
+</script>
+</body>
+</html>
